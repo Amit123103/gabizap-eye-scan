@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+mediapipe
+protobuf==3.20.3
+numpy

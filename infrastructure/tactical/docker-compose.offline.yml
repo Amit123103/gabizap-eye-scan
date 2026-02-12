@@ -1,0 +1,60 @@
+version: '3.8'
+
+# ---------------------------------------------------------------------------
+# GABIZAP TACTICAL EDGE CONFIGURATION
+# ---------------------------------------------------------------------------
+# Deployment Target: Panasonic Toughbook / AWS Snowball Edge
+# Constraint: NO INTERNET ACCESS (Air-Gapped)
+# ---------------------------------------------------------------------------
+
+services:
+  # Local Database (No RDS)
+  postgres-edge:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: gabizap
+      POSTGRES_PASSWORD: airgapped_password
+      POSTGRES_DB: gabizap_edge
+    volumes:
+      - edge_pg_data:/var/lib/postgresql/data
+    networks:
+      - tactical-net
+
+  # Local Cache
+  redis-edge:
+    image: redis:7-alpine
+    networks:
+      - tactical-net
+
+  # Core Auth (Essential Only)
+  auth-service:
+    image: gabizap/auth-service:latest
+    environment:
+      - DATABASE_URL=postgresql://gabizap:airgapped_password@postgres-edge:5432/gabizap_edge
+      - REDIS_URL=redis://redis-edge:6379
+      - ENV=TACTICAL
+    networks:
+      - tactical-net
+
+  # Iris Engine (Local Inference)
+  iris-engine:
+    image: gabizap/iris-engine:latest
+    environment:
+      - USE_GPU=false # Fallback to CPU for field laptops
+    networks:
+      - tactical-net
+
+  # Matcher (Local Cluster)
+  matcher:
+    image: gabizap/matcher:latest
+    environment:
+      - REDIS_URL=redis://redis-edge:6379
+    networks:
+      - tactical-net
+
+networks:
+  tactical-net:
+    driver: bridge
+
+volumes:
+  edge_pg_data:

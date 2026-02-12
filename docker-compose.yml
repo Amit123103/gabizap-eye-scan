@@ -1,0 +1,232 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # INFRASTRUCTURE SERVICES
+  # ---------------------------------------------------------------------------
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: gabizap-postgres
+    environment:
+      POSTGRES_USER: gabizap
+      POSTGRES_PASSWORD: secure_password
+      POSTGRES_DB: gabizap_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gabizap-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U gabizap" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: gabizap-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gabizap-net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # MONITORING STACK
+  # ---------------------------------------------------------------------------
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: gabizap-prometheus
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - gabizap-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: gabizap-grafana
+    ports:
+      - "3001:3000"
+    networks:
+      - gabizap-net
+
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: gabizap-gateway
+    environment:
+      - PORT=8000
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - USER_SERVICE_URL=http://user-service:8002
+      - IRIS_SERVICE_URL=http://iris-engine:8003
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth-service
+    networks:
+      - gabizap-net
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: gabizap-auth
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgresql://gabizap:secure_password@postgres:5432/gabizap_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=super_secret_jwt_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gabizap-net
+
+  user-service:
+    build: ./services/user-service
+    container_name: gabizap-user
+    environment:
+      - PORT=8002
+      - DATABASE_URL=postgresql://gabizap:secure_password@postgres:5432/gabizap_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gabizap-net
+
+  # ---------------------------------------------------------------------------
+  # BIOMETRIC INTELLIGENCE ENGINES
+  # ---------------------------------------------------------------------------
+
+  iris-engine:
+    build: ./services/iris-engine
+    container_name: gabizap-iris
+    environment:
+      - PORT=8003
+      - MODEL_PATH=/app/models/iris_v1.h5
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    networks:
+      - gabizap-net
+
+  hand-engine:
+    build: ./services/hand-engine
+    container_name: gabizap-hand
+    environment:
+      - PORT=8004
+    networks:
+      - gabizap-net
+
+  risk-engine:
+    build: ./services/risk-engine
+    container_name: gabizap-risk
+    environment:
+      - PORT=8005
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - gabizap-net
+
+  matcher:
+    build: ./services/matcher
+    container_name: gabizap-matcher
+    environment:
+      - PORT=8006
+      - REDIS_URL=redis://redis:6379/2
+    networks:
+      - gabizap-net
+
+  liveness-engine:
+    build: ./services/liveness-engine
+    container_name: gabizap-liveness
+    environment:
+      - PORT=8009
+    networks:
+      - gabizap-net
+
+  # ---------------------------------------------------------------------------
+  # PHYSICAL SECURITY (IoT)
+  # ---------------------------------------------------------------------------
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: gabizap-mqtt
+    ports:
+      - "1883:1883"
+    networks:
+      - gabizap-net
+
+  iot-gateway:
+    build: ./services/iot-gateway
+    container_name: gabizap-iot
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - MQTT_BROKER=mosquitto
+    depends_on:
+      - mosquitto
+      - auth-service
+    networks:
+      - gabizap-net
+
+  # ---------------------------------------------------------------------------
+  # AUDIT & BLOCKCHAIN SERVICES
+  # ---------------------------------------------------------------------------
+
+  audit-service:
+    build: ./services/audit-service
+    container_name: gabizap-audit
+    environment:
+      - PORT=8007
+      - DATABASE_URL=postgresql://gabizap:secure_password@postgres:5432/gabizap_db
+    networks:
+      - gabizap-net
+
+  ledger-service:
+    build: ./services/ledger-service
+    container_name: gabizap-ledger
+    environment:
+      - PORT=8008
+      - BLOCKCHAIN_NODE_URL=http://blockchain-node:8545
+    networks:
+      - gabizap-net
+
+  # ---------------------------------------------------------------------------
+  # FRONTEND
+  # ---------------------------------------------------------------------------
+
+  frontend:
+    build: ./frontend
+    container_name: gabizap-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - api-gateway
+    networks:
+      - gabizap-net
+
+networks:
+  gabizap-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
