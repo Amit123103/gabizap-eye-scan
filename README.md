@@ -7,7 +7,7 @@
 
 User trail:
 - Email: `admin@gabizap.io`
-- Password: (any password)
+- Password: admin123
 
 > **Defense-grade identity and access management system with AI-powered biometric authentication, zero-trust architecture, and autonomous cyber-defense capabilities.**
 
