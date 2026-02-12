@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 import os
 
 app = FastAPI(title="GABIZAP API", version="1.0.0")
@@ -22,8 +21,6 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # Models
 class LoginRequest(BaseModel):
     email: str
@@ -37,11 +34,11 @@ class User(BaseModel):
     email: str
     full_name: str = "Admin User"
 
-# Demo user database (replace with real database)
+# Simple demo authentication (no bcrypt needed)
 DEMO_USERS = {
     "admin@gabizap.io": {
         "email": "admin@gabizap.io",
-        "hashed_password": pwd_context.hash("admin123"),
+        "password": "admin123",  # In production, use hashed passwords
         "full_name": "Admin User"
     }
 }
@@ -81,7 +78,7 @@ async def login(credentials: LoginRequest):
     """
     user = DEMO_USERS.get(credentials.email)
     
-    if not user or not pwd_context.verify(credentials.password, user["hashed_password"]):
+    if not user or user["password"] != credentials.password:
         raise HTTPException(
             status_code=401,
             detail="Incorrect email or password"
