@@ -5,6 +5,10 @@
 [![React](https://img.shields.io/badge/React-18.2-61DAFB?logo=react)](https://reactjs.org/)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python)](https://www.python.org/)
 
+User trail:
+- Email: `admin@gabizap.io`
+- Password: (any password)
+
 > **Defense-grade identity and access management system with AI-powered biometric authentication, zero-trust architecture, and autonomous cyber-defense capabilities.**
 
 ---
