@@ -15,16 +15,29 @@ export const AuthProvider = ({ children }) => {
     }, [token]);
 
     const login = async (email, password) => {
-        // DEMO MODE: Accept admin@gabizap.io with any password
-        // In production, this would call the backend API
-        if (email === 'admin@gabizap.io' || (email === 'admin@example.com' && password === 'admin')) {
-            const mockToken = 'demo_token_' + Date.now();
-            localStorage.setItem('token', mockToken);
-            setToken(mockToken);
+        try {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://gabizap-eye-scan.onrender.com';
+            const response = await fetch(`${API_URL}/auth/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            if (!response.ok) {
+                throw new Error('Login failed');
+            }
+
+            const data = await response.json();
+            const newToken = data.access_token;
+
+            localStorage.setItem('token', newToken);
+            setToken(newToken);
             setIsAuthenticated(true);
             return true;
+        } catch (error) {
+            console.error("Login error:", error);
+            return false;
         }
-        return false;
     };
 
     const logout = () => {
