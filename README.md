@@ -377,8 +377,4 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 - FastAPI for the excellent Python framework
 - All contributors and supporters
 
----
 
-**Built with ❤️ for a more secure digital world**
-
-*GABIZAP - Where Identity Meets Intelligence*
